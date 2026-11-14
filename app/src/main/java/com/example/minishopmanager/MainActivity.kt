@@ -1,5 +1,6 @@
 package com.example.minishopmanager
 
+import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -11,8 +12,12 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
+
+    private val noms = ArrayList<String>()
+    private val prix = ArrayList<Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,16 +26,12 @@ class MainActivity : AppCompatActivity() {
         // Bouton Suivant (TP1)
         val btnNext = findViewById<Button>(R.id.btnNext)
         btnNext.setOnClickListener {
-            Toast.makeText(this, "Bonjour Yosr !", Toast.LENGTH_SHORT).show()
-            val intent = Intent(this, ProfileActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, ProfileActivity::class.java))
         }
 
-        // Catalogue de produits (TP2)
-        val listView = findViewById<ListView>(R.id.listViewProduits)
-        val products = resources.getStringArray(R.array.products)
+        // Catalogue chargé depuis produits.json
+        lireProduitsDepuisJSON()
 
-        // Un logo par produit, dans le même ordre que la liste
         val icons = listOf(
             R.drawable.ic_phone,
             android.R.drawable.ic_lock_silent_mode_off,
@@ -40,9 +41,9 @@ class MainActivity : AppCompatActivity() {
             android.R.drawable.ic_menu_camera
         )
 
-        // Adaptateur personnalisé : texte + logo pour chaque ligne
+        val listView = findViewById<ListView>(R.id.listViewProduits)
         val adapter = object : ArrayAdapter<String>(
-            this, R.layout.item_product, R.id.tvProduct, products
+            this, R.layout.item_product, R.id.tvProduct, noms
         ) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
@@ -52,11 +53,30 @@ class MainActivity : AppCompatActivity() {
         }
         listView.adapter = adapter
 
-        listView.setOnItemClickListener { parent, _, position, _ ->
-            val item = parent.getItemAtPosition(position).toString()
-            Toast.makeText(this, "Produit sélectionné : $item", Toast.LENGTH_SHORT).show()
+        // Clic sur un produit : Toast + ligne dans la table panier
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val dbHelper = DBHelper(this)
+            val db = dbHelper.writableDatabase
+            val values = ContentValues().apply {
+                put("nom", noms[position])
+                put("prix", prix[position])
+            }
+            db.insert("panier", null, values)
+            db.close()
+
+            Toast.makeText(this, "${noms[position]} ajouté au panier", Toast.LENGTH_SHORT).show()
         }
 
         Log.d("LIFECYCLE", "onCreate appelé")
+    }
+
+    private fun lireProduitsDepuisJSON() {
+        val jsonString = assets.open("produits.json").bufferedReader().use { it.readText() }
+        val jsonArray = JSONObject(jsonString).getJSONArray("produits")
+        for (i in 0 until jsonArray.length()) {
+            val p = jsonArray.getJSONObject(i)
+            noms.add(p.getString("nom"))
+            prix.add(p.getInt("prix"))
+        }
     }
 }
